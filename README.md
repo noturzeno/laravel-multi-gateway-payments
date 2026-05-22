@@ -1,64 +1,147 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# Laravel Recon & eColl Payment Gateways
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 8 reference application for integrating **Recon Payment** (redirect + SHA-256) and **eColl 2.0** (redirect + SHA-512 + server webhook). Includes guest checkout for eColl, transaction persistence, and Sanctum API authentication.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Recon Payment** — Build signed redirect URLs from environment config; notify and return callback routes
+- **eColl 2.0** — Guest checkout (name, email, amount), transaction records, gateway redirect, browser return URLs, and webhook with hash verification and idempotency for completed payments
+- **API auth** — Sanctum token-based `login` and `register` endpoints
+- **Laravel UI** — Session-based web authentication (`Auth::routes()`)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requirements
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 7.3+ or 8.x
+- Composer
+- MySQL (or compatible database)
+- Node.js & npm (optional, for frontend assets)
 
-## Learning Laravel
+## Installation
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+```bash
+git clone <your-repo-url>
+cd laravel-payment
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-## Laravel Sponsors
+Configure your database in `.env`, then run migrations:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+```bash
+php artisan migrate
+```
 
-### Premium Partners
+Start the development server:
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+```bash
+php artisan serve
+```
 
-## Contributing
+## Environment variables
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Copy values from your payment provider dashboards into `.env`. See [`.env.example`](.env.example) for the full list.
 
-## Code of Conduct
+### Recon Payment
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| Variable | Description |
+|----------|-------------|
+| `RECON_SECRET_KEY` | Merchant signing secret |
+| `RECON_MERCHANT_CODE` | Merchant code |
+| `RECON_RETURN_URL` | Browser return URL after payment |
+| `RECON_NOTIFY_URL` | Server notify URL |
+| `RECON_CURRENCY` | Currency code (default: `HKD`) |
+| `RECON_AMOUNT` | Default payment amount |
+| `RECON_DESCRIPTION` | Payment description shown to gateway |
+| `RECON_USE_PRODUCTION` | `true` for production URL, `false` for UAT |
 
-## Security Vulnerabilities
+### eColl 2.0
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Variable | Description |
+|----------|-------------|
+| `ECOLL_BASE_URI` | Gateway redirect endpoint |
+| `ECOLL_HASH_SECRET` | Shared hash secret |
+| `ECOLL_TRAN_TYPE` | Transaction type code |
+| `ECOLL_DEPT_CODE` | Department code (TranRefNo) |
+| `ECOLL_MAIN_ACTIVITY_CODE` | Activity code (TranRefNo) |
+| `ECOLL_APP_SYSTEM_CODE` | Application code (TranRefNo) |
+| `ECOLL_RETURN_URI_*` | Success, failed, and cancelled return URLs (configure in eColl portal) |
+
+Never commit real secrets. Use `.env` locally and secure variables in production.
+
+## Routes
+
+### Recon (web)
+
+| Method | Path | Name | Description |
+|--------|------|------|-------------|
+| GET | `/payment` | `payment` | Payment page with signed Recon URL |
+| GET | `/recon` | `recon` | Alternate Recon entry view |
+| GET | `/notify` | `notify` | Notify callback view |
+| POST | `/return` | `return` | Return callback (displays gateway payload) |
+
+### eColl (web)
+
+| Method | Path | Name | Description |
+|--------|------|------|-------------|
+| GET | `/ecoll/payment` | `ecoll.payment.create` | Guest payment form |
+| POST | `/ecoll/payment/redirect` | `ecoll.payment.redirect` | Create transaction and redirect to gateway |
+| GET | `/ecoll/payment/success` | `ecoll.payment.success` | Success return (`?TranRefNo=`) |
+| GET | `/ecoll/payment/failed` | `ecoll.payment.failed` | Failed return |
+| GET | `/ecoll/payment/cancelled` | `ecoll.payment.cancelled` | Cancelled return |
+| POST | `/ecoll/webhook` | `ecoll.webhook` | Server-to-server status update (CSRF exempt) |
+
+### API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/login` | Sign in, returns Sanctum token |
+| POST | `/api/register` | Register, returns Sanctum token |
+| GET | `/api/user` | Current user (requires `auth:sanctum`) |
+
+## Project structure
+
+```
+app/
+├── Http/Controllers/
+│   ├── PaymentController.php      # Recon views and callbacks
+│   ├── EcollPaymentController.php # eColl guest checkout and returns
+│   ├── EcollWebhookController.php # eColl webhook handler
+│   └── Api/AuthController.php     # Sanctum login/register
+├── Models/Transaction.php           # Payment records
+└── Services/
+    ├── ReconPaymentService.php      # Recon URL signing
+    ├── EcollPaymentService.php      # eColl transaction + redirect
+    └── EcollHashService.php         # eColl SHA-512 hash build/validate
+config/
+├── payment.php                      # Recon configuration
+└── ecoll.php                        # eColl configuration
+```
+
+## Payment flows
+
+**Recon:** `PaymentController` delegates to `ReconPaymentService`, which reads `config/payment.php`, builds a SHA-256 signed redirect URL, and passes it to the view.
+
+**eColl:** User submits name, email, and amount → `EcollPaymentService` creates a `transactions` row and redirects to the gateway with an inward hash → eColl calls `POST /ecoll/webhook` → `EcollWebhookController` validates the outward hash and updates transaction status.
+
+## Testing
+
+Tests use in-memory SQLite (see `phpunit.xml`).
+
+```bash
+./vendor/bin/phpunit
+```
+
+Coverage includes eColl hash signing/validation, Recon URL building, webhook handling, and redirect form validation.
+
+## Security notes
+
+- Keep `RECON_SECRET_KEY` and `ECOLL_HASH_SECRET` out of version control
+- The eColl webhook route is excluded from CSRF verification in `VerifyCsrfToken` — protect it with network rules or provider IP allowlists where possible
+- eColl payment routes support **guest checkout** (no login required)
+- Configure return and webhook URLs in your gateway portal to match your deployed `APP_URL`
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
